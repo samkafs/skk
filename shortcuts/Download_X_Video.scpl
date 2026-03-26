@@ -1,0 +1,35 @@
+# Download X Video
+# - Works with pasted links and share-sheet links.
+# - Uses api.fxtwitter.com to resolve direct media URLs.
+
+AskforInput question="Paste or share a Twitter/X post URL" defaultAnswer=s:ShortcutInput inputType="URL" -> v:InputURL
+
+MatchText pattern="(?:https?:\\/\\/)?(?:www\\.|mobile\\.)?(?:x|twitter)\\.com\\/[^\\/]+\\/status\\/(\\d+)" caseSensitive=false ^(GetVariable v:InputURL)
+GetItemfromList get="First Item"
+GetGroupfromMatchedText get="Group At Index" groupIndex=1 -> v:TweetID
+
+Text "https://api.fxtwitter.com/i/status/\(v:TweetID)" -> v:ApiURL
+GetContentsofURL advanced=true method="GET" headers=true headers2={Accept:"application/json"} ^(GetVariable v:ApiURL) -> v:ApiResponse
+
+GetDictionaryValue key="code" ^(GetVariable v:ApiResponse)
+If "Equals" "200"
+	GetDictionaryValue key="tweet.media.videos" ^(GetVariable v:ApiResponse) -> v:Videos
+	GetVariable v:Videos
+	If "Contains" "url"
+		GetVariable v:Videos
+		RepeatwithEach
+			GetDictionaryValue key="url"
+			AddtoVariable v:VideoURLs
+		end
+		GetVariable v:VideoURLs
+		ChoosefromList prompt="Choose version to download" selectMultiple=false -> v:SelectedVideoURL
+		GetContentsofURL advanced=true method="GET" headers=false ^(GetVariable v:SelectedVideoURL)
+		SavetoPhotoAlbum "Recents"
+		ShowAlert title="Saved" message="Video saved to Photos." showCancelButton=false
+	otherwise
+		ShowAlert title="No video found" message="This post may not contain downloadable video media." showCancelButton=false
+	end
+otherwise
+	GetDictionaryValue key="message" ^(GetVariable v:ApiResponse)
+	ShowAlert title="Could not fetch video" message="API error: \(s:ActionInput)" showCancelButton=false
+end
